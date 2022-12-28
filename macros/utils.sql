@@ -1,10 +1,10 @@
 {% macro run_query(query) %}
   {% set start_time = modules.datetime.datetime.now() %}
-  {{ dbt_unit_testing.verbose('Running query => ' ~ dbt_unit_testing.sanitize(query)) }}
+  {{ dbt_flow.verbose('Running query => ' ~ dbt_flow.sanitize(query)) }}
   {% set results = run_query(query) %}
   {% set end_time = modules.datetime.datetime.now() - start_time %}
-  {{ dbt_unit_testing.verbose('Execution time => ' ~ end_time) }}
-  {{ dbt_unit_testing.verbose('==============================================================') }}
+  {{ dbt_flow.verbose('Execution time => ' ~ end_time) }}
+  {{ dbt_flow.verbose('==============================================================') }}
   {{ return (results) }}
 {% endmacro %}
 
@@ -18,7 +18,7 @@
 {% endmacro %}
 
 {% macro extract_columns_list(query) %}
-  {% set results = dbt_unit_testing.run_query(query) %}
+  {% set results = dbt_flow.run_query(query) %}
   {% set columns = results.columns | map(attribute='name') | list %}
   {{ return (columns) }}
 {% endmacro %}
@@ -29,7 +29,7 @@
 {% endmacro %}
 
 {% macro quote_and_join_columns(columns) %}
-  {% set columns = dbt_unit_testing.map(columns, dbt_unit_testing.quote_identifier) | join(",") %}
+  {% set columns = dbt_flow.map(columns, dbt_flow.quote_identifier) | join(",") %}
   {{ return (columns) }}
 {% endmacro %}
 
@@ -48,13 +48,17 @@
 {% endmacro %}
 
 {% macro debug(s) %}
-  {{ dbt_unit_testing.log_info (s, only_on_execute=true) }}
+  {{ dbt_flow.log_info (s, only_on_execute=true) }}
 {% endmacro %}
 
 {% macro verbose(s) %}
-  {% if var('verbose', dbt_unit_testing.config_is_true('verbose')) %}
-    {{ dbt_unit_testing.log_info (s, only_on_execute=true) }}
+  {% if var('verbose', dbt_flow.config_is_true('verbose')) %}
+    {{ dbt_flow.log_info (s, only_on_execute=true) }}
   {% endif %}
+{% endmacro %}
+
+{% macro build_flow_identifier(test_name, identifier) %}
+  {% do return('dbt_flow_' ~ test_name ~ '__' ~ identifier) %}
 {% endmacro %}
 
 {% macro map(items, f) %}
@@ -77,11 +81,11 @@
 
 {% macro model_node (model_name) %}
   {% set node = nil
-      | default(dbt_unit_testing.graph_node_by_prefix("model", model_name))
-      | default(dbt_unit_testing.graph_node_by_prefix("snapshot", model_name)) 
-      | default(dbt_unit_testing.graph_node_by_prefix("seed", model_name)) %}
+      | default(dbt_flow.graph_node_by_prefix("model", model_name))
+      | default(dbt_flow.graph_node_by_prefix("snapshot", model_name)) 
+      | default(dbt_flow.graph_node_by_prefix("seed", model_name)) %}
   {% if not node %}
-    {{ dbt_unit_testing.raise_error("Node " ~ model.package_name ~ "." ~ model_name ~ " not found.") }}
+    {{ dbt_flow.raise_error("Node " ~ model.package_name ~ "." ~ model_name ~ " not found.") }}
   {% endif %}
   {{ return (node) }}
 {% endmacro %}
@@ -92,9 +96,9 @@
 
 {% macro graph_node(source_name, model_name) %}
   {% if source_name %}
-    {{ return (dbt_unit_testing.source_node(source_name, model_name)) }}
+    {{ return (dbt_flow.source_node(source_name, model_name)) }}
   {% else %}
-    {{ return (dbt_unit_testing.model_node(model_name)) }}
+    {{ return (dbt_flow.model_node(model_name)) }}
   {% endif  %}
 {% endmacro %}
 
@@ -115,17 +119,17 @@
 {% endmacro %}
 
 {% macro config_is_true(config_name) %}
-  {{ return (dbt_unit_testing.get_config(config_name, default_value=false))}}
+  {{ return (dbt_flow.get_config(config_name, default_value=false))}}
 {% endmacro %}
 
 {% macro merge_configs(configs) %}
   {% set unit_tests_config = var("unit_tests_config", {}) %}
   {% set unit_tests_config = {} if unit_tests_config is none else unit_tests_config %}
-  {{ return (dbt_unit_testing.merge_jsons([unit_tests_config] + configs)) }}
+  {{ return (dbt_flow.merge_jsons([unit_tests_config] + configs)) }}
 {% endmacro %}
 
 {% macro quote_identifier(identifier) %}
-    {{ return(adapter.dispatch('quote_identifier','dbt_unit_testing')(identifier)) }}
+    {{ return(adapter.dispatch('quote_identifier','dbt_flow')(identifier)) }}
 {% endmacro %}
 
 {% macro default__quote_identifier(identifier) -%}
@@ -153,7 +157,7 @@
 {% endmacro %}
 
 {% macro cache(scope_key, key, value) %}
-  {% if dbt_unit_testing.config_is_true('disable_cache') %}
+  {% if dbt_flow.config_is_true('disable_cache') %}
     {{ return (nil) }}
   {% else %}
     {% set cache = graph.get("__DUT_CACHE__", {}) %}

@@ -5,17 +5,17 @@
   {% set build_full_lineage = not options.use_database_models %}
 
   {# `metrics_dependencies` are used to update the final SQL with the the proper metric references #}
-  {% set model_dependencies, metrics_dependencies = dbt_unit_testing.build_model_dependencies(
+  {% set model_dependencies, metrics_dependencies = dbt_flow.build_model_dependencies(
     model_node, models_to_exclude, build_full_lineage)
   %}
 
   {% set cte_dependencies = [] %}
   {% for node_id in model_dependencies %}
-    {% set node = dbt_unit_testing.node_by_id(node_id) %}
+    {% set node = dbt_flow.node_by_id(node_id) %}
     {% set mock = mocks | selectattr("unique_id", "==", node_id) | first %}
-    {% set cte_name = dbt_unit_testing.cte_name(mock if mock else node) %}
-    {% set cte_sql = mock.input_values if mock else dbt_unit_testing.build_node_sql(node, use_database_models=options.use_database_models) %}
-    {% set cte = dbt_unit_testing.quote_identifier(cte_name) ~ " as (" ~ cte_sql ~ ")" %}
+    {% set cte_name = dbt_flow.cte_name(mock if mock else node) %}
+    {% set cte_sql = mock.input_values if mock else dbt_flow.build_node_sql(node, use_database_models=options.use_database_models) %}
+    {% set cte = dbt_flow.quote_identifier(cte_name) ~ " as (" ~ cte_sql ~ ")" %}
     {% set cte_dependencies = cte_dependencies.append(cte) %}
   {%- endfor -%}
 
@@ -25,54 +25,54 @@
       {{ cte_dependencies | join(",\n") }}
     {%- endif -%}
     {{ "\n" }}
-    select * from ({{ dbt_unit_testing.render_node(model_node) }} {{ "\n" }} ) as t
+    select * from ({{ dbt_flow.render_node(model_node) }} {{ "\n" }} ) as t
   {%- endset -%}
 
-  {% set model_complete_sql = dbt_unit_testing.replace_metric_refs(model_complete_sql, metrics_dependencies) %}
+  {% set model_complete_sql = dbt_flow.replace_metric_refs(model_complete_sql, metrics_dependencies) %}
   {% do return(model_complete_sql) %}
 {% endmacro %}
 
 {# As metrics are defined directly in yaml files, we can't replace their `ref` with the
-   macro `dbt_unit_testing.ref` so the translation in the final SQL is still required
+   macro `dbt_flow.ref` so the translation in the final SQL is still required
 #}
 {% macro replace_metric_refs(model_sql, model_dependencies) %}
   {% set ns = namespace(model_sql = model_sql) %}
 
   {% for node_id in model_dependencies %}
-    {% set node = dbt_unit_testing.node_by_id(node_id) %}
+    {% set node = dbt_flow.node_by_id(node_id) %}
     {% set relation = api.Relation.create(
         database = node.database,
         schema = node.schema,
         identifier = node.alias
       )
     %}
-    {% set ns.model_sql = ns.model_sql | replace(relation, dbt_unit_testing.ref(node.alias)) %}
+    {% set ns.model_sql = ns.model_sql | replace(relation, dbt_flow.ref(node.alias)) %}
   {% endfor %}
   {% do return(ns.model_sql) %}
 {% endmacro %}
 
 {% macro cte_name(node) %}
   {% if node.resource_type in ('source') %}
-    {{ return (dbt_unit_testing.source_cte_name(node.source_name, node.name)) }}
+    {{ return (dbt_flow.source_cte_name(node.source_name, node.name)) }}
   {% else %}
-    {{ return (dbt_unit_testing.ref_cte_name(node.name)) }}
+    {{ return (dbt_flow.ref_cte_name(node.name)) }}
   {% endif %}
 {% endmacro %}
 
 {% macro ref_cte_name(model_name) %}
-  {{ return (dbt_unit_testing.quote_identifier(model_name)) }}
+  {{ return (dbt_flow.quote_identifier(model_name)) }}
 {% endmacro %}
 
 {% macro source_cte_name(source, table_name) %}
   {%- set cte_name -%}
-    {%- if dbt_unit_testing.config_is_true("use_qualified_sources") -%}
-      {%- set source_node = dbt_unit_testing.source_node(source, table_name) -%}
+    {%- if dbt_flow.config_is_true("use_qualified_sources") -%}
+      {%- set source_node = dbt_flow.source_node(source, table_name) -%}
       {{ [source, table_name] | join("__") }}
     {%- else -%}
       {{ table_name }}
     {%- endif -%}
   {%- endset -%}
-  {{ return (dbt_unit_testing.quote_identifier(cte_name)) }}
+  {{ return (dbt_flow.quote_identifier(cte_name)) }}
 {% endmacro %}
 
 {% macro build_model_dependencies(node, models_to_exclude, build_full_lineage=True) %}
@@ -82,7 +82,7 @@
     {% if 'calendar' in node_id %}
       {{ metrics_dependencies.append(node_id) }}
     {% endif %}
-    {% set node = dbt_unit_testing.node_by_id(node_id) %}
+    {% set node = dbt_flow.node_by_id(node_id) %}
     {% if node.resource_type == 'metric' %}
       {# We need to extract from the node in which metric depends on instead, not the metric
          node itself as metrics resources are not models, they are definitions that points to models.
@@ -90,11 +90,11 @@
       #}
       {% set metric_dependency_node_id = node.depends_on.nodes[0] %}
       {{ metrics_dependencies.append(metric_dependency_node_id) }}
-      {% set node = dbt_unit_testing.node_by_id(metric_dependency_node_id) %}
+      {% set node = dbt_flow.node_by_id(metric_dependency_node_id) %}
     {% endif %}
     {% if node.unique_id not in models_to_exclude %}
       {% if node.resource_type in ('model', 'snapshot') and build_full_lineage %}
-        {% set child_model_dependencies, child_metric_depedencies = dbt_unit_testing.build_model_dependencies(node, models_to_exclude) %}
+        {% set child_model_dependencies, child_metric_depedencies = dbt_flow.build_model_dependencies(node, models_to_exclude) %}
         {% for dependency_node_id in child_model_dependencies %}
           {{ model_dependencies.append(dependency_node_id) }}
         {% endfor %}
@@ -122,12 +122,12 @@
       {% set name = node.name %}
     {%- endif %}
 
-    select * from {{ dbt_unit_testing.quote_identifier(node.database) ~ '.' ~ dbt_unit_testing.quote_identifier(node.schema) ~ '.' ~ dbt_unit_testing.quote_identifier(name) }} where false
+    select * from {{ dbt_flow.quote_identifier(node.database) ~ '.' ~ dbt_flow.quote_identifier(node.schema) ~ '.' ~ dbt_flow.quote_identifier(name) }} where false
   {%- else -%}
     {% if complete %}
-      {{ dbt_unit_testing.build_model_complete_sql(node) }}
+      {{ dbt_flow.build_model_complete_sql(node) }}
     {%- else -%}
-      {{ dbt_unit_testing.render_node(node) ~ "\n"}}
+      {{ dbt_flow.render_node(node) ~ "\n"}}
     {%- endif -%}
   {%- endif -%}
 {% endmacro %}

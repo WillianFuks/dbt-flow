@@ -2,7 +2,7 @@
     {% set input_values_sql = input_values %}
 
     {% if options.input_format | lower == "csv" %}
-      {% set input_values_sql = dbt_unit_testing.sql_from_csv_input(input_values, options) %}
+      {% set input_values_sql = dbt_flow.sql_from_csv_input(input_values, options) %}
     {%- endif -%}
 
     {{ return (input_values_sql) }}

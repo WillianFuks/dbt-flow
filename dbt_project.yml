@@ -1,8 +1,9 @@
-name: 'dbt_unit_testing'
+---
+name: 'dbt_flow'
 version: '0.1.0'
 config-version: 2
 
-require-dbt-version: [">=0.20.2"]
+require-dbt-version: [">=1.3.1"]
 
 target-path: "target"
 clean-targets: ["target", "dbt_modules", "dbt_packages"]

@@ -26,39 +26,39 @@
   {% set cells = [] %}
   {% for col_name in agate_table.column_names %}
     {% set col_index = loop.index0 %}
-    {% set padded = dbt_unit_testing.pad(col_name, columns_info[col_index].max_length, pad_right=columns_info[col_index].is_string) %}
+    {% set padded = dbt_flow.pad(col_name, columns_info[col_index].max_length, pad_right=columns_info[col_index].is_string) %}
     {% if columns_info[col_index].has_differences %}
       {% do cells.append("{RED}" ~ padded ~ "{RESET}") %}
     {% else %}
       {% do cells.append(padded) %}
     {% endif %}
   {% endfor %}
-  {{ dbt_unit_testing.println("| " ~ cells | join(" | ") ~ " |")}}
+  {{ dbt_flow.println("| " ~ cells | join(" | ") ~ " |")}}
 
   {% set cells = [] %}
   {% for col_name in agate_table.column_names %}
     {% set col_index = loop.index0 %}
-    {% set line = dbt_unit_testing.pad("", columns_info[col_index].max_length, c="-") %}
+    {% set line = dbt_flow.pad("", columns_info[col_index].max_length, c="-") %}
     {% if columns_info[col_index].has_differences %}
       {% do cells.append("{RED}" ~ line ~ "{RESET}") %}
     {% else %}
       {% do cells.append(line) %}
     {% endif %}
   {% endfor %}
-  {{ dbt_unit_testing.println("| " ~ cells | join(" | ") ~ " |")}}
+  {{ dbt_flow.println("| " ~ cells | join(" | ") ~ " |")}}
 
   {% for row in agate_table.rows %}
     {% set cells = [] %}
     {% for cell_value in row %}
       {% set col_index = loop.index0 %}
-        {% set padded = dbt_unit_testing.pad(cell_value, columns_info[col_index].max_length, pad_right=cell_value is string) %}
+        {% set padded = dbt_flow.pad(cell_value, columns_info[col_index].max_length, pad_right=cell_value is string) %}
         {% if columns_info[col_index].has_differences %}
           {% do cells.append("{RED}" ~ padded ~ "{RESET}") %}
         {% else %}
           {% do cells.append(padded) %}
         {% endif %}
     {% endfor %}
-    {{ dbt_unit_testing.println("| " ~ cells | join(" | ") ~ " |")}}
+    {{ dbt_flow.println("| " ~ cells | join(" | ") ~ " |")}}
   {% endfor %}
 
 {% endmacro %}
@@ -81,5 +81,5 @@
 {% endmacro %}
 
 {% macro println(s) %}
-  {% do log(dbt_unit_testing.parse_colors(s ~ "{RESET}"), info=true) %}
+  {% do log(dbt_flow.parse_colors(s ~ "{RESET}"), info=true) %}
 {% endmacro %}

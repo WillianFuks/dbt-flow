@@ -20,6 +20,14 @@ metrics:
     timestamp: most_recent_order
     time_grains: [day, all_time]
 
+  - name: derived_test
+    label: der_test
+    calculation_method: derived
+    expression: >-
+      "{{metric('average_order_amount')}} / {{metric('total_order_amount')}}"
+    timestamp: most_recent_order
+    time_grains: [day, all_time]
+
 models:
   - name: customers
     description: >-
