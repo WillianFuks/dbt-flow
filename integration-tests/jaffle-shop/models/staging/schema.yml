@@ -1,6 +1,14 @@
 ---
 version: 2
 
+sources:
+  - name: test_source
+    database: test_database
+    schema: test_schema
+    tables:
+      - name: test_table
+        identifier: test_table_identifier
+
 models:
   - name: stg_customers
     columns:
@@ -18,7 +26,9 @@ models:
       - name: status
         tests:
           - accepted_values:
-              values: ['placed', 'shipped', 'completed', 'return_pending', 'returned']
+              values: [
+                'placed', 'shipped', 'completed', 'return_pending', 'returned'
+              ]
 
   - name: stg_payments
     columns:

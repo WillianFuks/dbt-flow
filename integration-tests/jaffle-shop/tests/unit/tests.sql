@@ -2,10 +2,11 @@
 -- depends_on: {{ ref('stg_orders') }}
 -- depends_on: {{ ref('stg_payments') }}
 -- depends_on: {{ ref('dbt_metrics_default_calendar') }}
+-- depends_on: {{ ref('stg_source_model') }}
 
 {{
     config(
-        tags=['unit-test', 'no-db-dependency']
+        tags=['unit-test']
     )
 }}
 
@@ -27,7 +28,7 @@
     select '2023-01-01'::Timestamp as metric_start_date, '2023-01-01'::Timestamp as metric_end_date, 1.5 as average_order_amount, 1.5 as total_order_amount
   {% endcall %}
 {% endcall %}
-{#
+
 UNION ALL
 
 {% call dbt_flow.test('customers', 'test_customers_1', 'customers table should return expected result') %}
@@ -51,7 +52,7 @@ UNION ALL
 
 UNION ALL
 
-{% call dbt_flow.test('customers', 'should show customer_id without orders') %}
+{% call dbt_flow.test('customers', 'test_customers_2', 'should show customer_id without orders') %}
 
   {% call dbt_flow.mock_ref ('stg_customers') %}
     select 1 as customer_id, '' as first_name, '' as last_name
@@ -72,7 +73,7 @@ UNION ALL
 
 UNION ALL
 
-{% call dbt_flow.test('customers', 'should show customer name') %}
+{% call dbt_flow.test('customers', 'test_customers_3', 'should show customer name') %}
 
   {% call dbt_flow.mock_ref ('stg_customers') %}
     select null::Numeric as customer_id, 'John' as first_name, 'Doe' as last_name
@@ -93,7 +94,7 @@ UNION ALL
 
 UNION ALL
 
-{% call dbt_flow.test('customers', 'should sum order values to calculate customer_lifetime_value') %}
+{% call dbt_flow.test('customers', 'test_customers_4', 'should sum order values to calculate customer_lifetime_value') %}
   
   {% call dbt_flow.mock_ref ('stg_customers') %}
     select 1 as customer_id, '' as first_name, '' as last_name
@@ -118,7 +119,7 @@ UNION ALL
 
 UNION ALL
 
-{% call dbt_flow.test('customers', 'should calculate the number of orders') %}
+{% call dbt_flow.test('customers', 'test_customers_5', 'should calculate the number of orders') %}
   
   {% call dbt_flow.mock_ref ('stg_customers') %}
     select 1 as customer_id, '' as first_name, '' as last_name
@@ -143,7 +144,7 @@ UNION ALL
 
 UNION ALL
 
-{% call dbt_flow.test('customers', 'should calculate most recent order') %}
+{% call dbt_flow.test('customers', 'test_customers_6', 'should calculate most recent order') %}
   
   {% call dbt_flow.mock_ref ('stg_customers') %}
     select 1 as customer_id, '' as first_name, '' as last_name
@@ -190,4 +191,17 @@ UNION ALL
     select 1 as customer_id, '2020-10-01'::Timestamp as first_order
   {% endcall %}
 {% endcall %}
-#}
+
+UNION ALL
+
+{% call dbt_flow.test('source_mart', 'test_source_mocking_1', 'test source mocking') %}
+  
+  {% call dbt_flow.mock_source('test_source', 'test_table') %}
+    select 1 as colA, 'b' as colB
+  {% endcall %}
+  
+
+  {% call dbt_flow.expect() %}
+    select 1 as colA, 'b' as colB
+  {% endcall %}
+{% endcall %}
