@@ -1,189 +1,185 @@
-{% macro test(model_name, test_description, options={}) %}
-  {{ dbt_unit_testing.ref_tested_model(model_name) }}
-
-  {% if execute %}
-    {% set test_configuration = {
-      "model_name": model_name, 
-      "description": test_description, 
-      "options": dbt_unit_testing.merge_configs([options])} 
-    %}
-    {% set mocks_and_expectations_json_str = caller() %}
-
-    {{ dbt_unit_testing.verbose("CONFIG: " ~ test_configuration) }}
-    
-    {% do test_configuration.update (dbt_unit_testing.build_mocks_and_expectations(test_configuration, mocks_and_expectations_json_str)) %}
-    {% set test_report = dbt_unit_testing.build_test_report(test_configuration) %}
-
-    {% if not test_report.succeeded %}
-      {{ dbt_unit_testing.show_test_report(test_configuration, test_report) }}
+{% macro test(model_name, test_name, test_description, options={}) %}
+    {% if execute %}
+        {% if not adapter.check_schema_exists(database=target.database, schema=target.schema) %}
+            {% do adapter.create_schema(api.Relation.create(database=target.database, schema=target.schema)) %}
+        {% endif %}
+  
+        {% set test_configuration = {
+          'model_name': model_name,
+          'test_name': test_name,
+          'description': test_description,
+          'options': dbt_flow.merge_configs([options])}
+        %}
+  
+        {% set mocks_and_expectations_json_str = caller() %}
+  
+        {% do test_configuration.update(dbt_flow.build_mocks_and_expectations(test_configuration, mocks_and_expectations_json_str)) %}
+        {% do dbt_flow.run_test(test_configuration) %}
+  
+        {# this query is mandatory as otherwise dbt's testing framework will break when trying to execute the test
+        against the database #}
+        select 1 from (select 1) as t where False
     {% endif %}
-    
-    select 1 as a from (select 1) as t where {{ not test_report.succeeded }}
-  {% endif %}
 {% endmacro %}
 
 {% macro build_mocks_and_expectations(test_configuration, mocks_and_expectations_json_str) %}
-    {% set mocks_and_expectations = dbt_unit_testing.split_json_str(mocks_and_expectations_json_str) %}
-
+    {% set mocks_and_expectations = dbt_flow.split_json_str(mocks_and_expectations_json_str) %}
     {% for mock_or_expectation in mocks_and_expectations %}
-      {% do mock_or_expectation.update( {"options": dbt_unit_testing.merge_configs([test_configuration.options, mock_or_expectation.options])}) %}
-      {% set input_values = dbt_unit_testing.build_input_values_sql(mock_or_expectation.input_values, mock_or_expectation.options) %}
-      {% do mock_or_expectation.update({"input_values": input_values}) %}
+        {% do mock_or_expectation.update(
+            {'options': dbt_flow.merge_configs([test_configuration.options, mock_or_expectation.options]),
+             'input_values': mock_or_expectation.input_values
+            })
+        %}
     {% endfor %}
 
-    {% set mocks = mocks_and_expectations | selectattr("type", "==", "mock") | list %}
-    {% set expectations = mocks_and_expectations | selectattr("type", "==", "expectations") | first %}
+    {% set mocks = mocks_and_expectations | selectattr('type', '==', 'mock') | list %}
+    {% set expectations = mocks_and_expectations | selectattr('type', '==', 'expectations') | first %}
 
     {% for mock in mocks %}
-      {% do mock.update({"unique_id": dbt_unit_testing.graph_node(mock.source_name, mock.name).unique_id}) %}
-      {% if mock.options.include_missing_columns %}
-        {% do dbt_unit_testing.enrich_mock_sql_with_missing_columns(mock, test_configuration.options) %}
-      {% endif %}
+      {% do mock.update({'unique_id': dbt_flow.graph_node(mock.source_name, mock.name).unique_id}) %}
     {% endfor %}
 
     {% set mocks_and_expectations_json = {
-      "mocks": mocks,
-      "expectations": expectations
+      'mocks': mocks,
+      'expectations': expectations
       }
     %}
 
-    {{ return (mocks_and_expectations_json) }}
+    {% do return(mocks_and_expectations_json) %}
 {% endmacro %}
 
-{% macro build_test_report(test_configuration) %}
-
-  {% set test_queries = dbt_unit_testing.build_test_queries(test_configuration) %}
-  {% set test_report = dbt_unit_testing.run_test_query(test_configuration, test_queries) %}
-
-  {{ dbt_unit_testing.verbose("-------------------- " ~ test_configuration.model_name ~ " --------------------" ) }}
-  {{ dbt_unit_testing.verbose(test_queries.test_query) }}
-  {{ dbt_unit_testing.verbose("----------------------------------------" ) }}
-
-  {{ return (test_report) }}
+{# source nodes don't have information on them about the appropriate database and schema to where
+tables should be built so this macro saves this information in the test configuration and it is used
+later on when its mocking is requried #}
+{% macro update_adapter_config_info(config, node) %}
+    {{ config.update({
+      'database': node.database,
+      'schema': node.schema
+    }) }}
 {% endmacro %}
 
-{% macro build_test_queries(test_configuration) %}
-  {% set expectations = test_configuration.expectations %}
-  {% set model_node = dbt_unit_testing.model_node(test_configuration.model_name) %}
-  {%- set model_complete_sql = dbt_unit_testing.build_model_complete_sql(model_node, test_configuration.mocks, test_configuration.options) -%}
-  {% set columns = dbt_unit_testing.quote_and_join_columns(dbt_unit_testing.extract_columns_list(expectations.input_values)) %}
+{% macro run_test(test_configuration) %}
+    {% set expectations = test_configuration.expectations %}
+    {% set node = dbt_flow.model_node(test_configuration.model_name) %}
+    {% do dbt_flow.update_adapter_config_info(test_configuration, node) %}
+    {% set relations, flow_relations = [], [] %}
+    {% do dbt_flow.build_graph_views(node, test_configuration, relations, flow_relations) %}
+    {% set flow_relation = dbt_flow.build_flow_relation(node.database, node.schema, node.name, test_configuration.test_name) %}
+    {% set flow_relation = api.Relation.create(
+        database=node.database, schema=node.schema, identifier=dbt_flow.build_flow_identifier(test_configuration.test_name, node.name))
+    %}
+    {% set expect_rel = dbt_flow.build_expectations_table(expectations, node, test_configuration) %}
 
-  {%- set actual_query -%}
-    select count(1) as count, {{columns}} from ( {{ model_complete_sql }} ) as s group by {{ columns }}
-  {% endset %}
-
-  {%- set expectations_query -%}
-    select count(1) as count, {{columns}} from ({{ expectations.input_values }}) as s group by {{ columns }}
-  {% endset %}
-
-  {%- set test_query -%}
-    with expectations as (
-      {{ expectations_query }}
-    ),
-    actual as (
-      {{ actual_query }}
-    ),
-
-    extra_entries as (
-    select '+' as diff, count, {{columns}} from actual
-    {{ except() }}
-    select '+' as diff, count, {{columns}} from expectations),
-
-    missing_entries as (
-    select '-' as diff, count, {{columns}} from expectations
-    {{ except() }}
-    select '-' as diff, count, {{columns}} from actual)
-    
-    select * from extra_entries
-    UNION ALL
-    select * from missing_entries
-
-    {% set sort_field = test_configuration.options.get("output_sort_field") %}
-    {% if sort_field %}
-    ORDER BY {{ sort_field }}
+    {% set results = run_query(dbt_utils.test_equality(expect_rel, flow_relation)) %}
+    {% if results.columns[0].values() %}
+        {% do log('\n' * 2 ~ 'Expected results are not equal to the actual ones:\n', True) %}
+        {% do log('*' * 90, True) %}
+        {% do results.print_table(max_columns=results.columns.keys() | length) %}
+        {% do log('\n' ~ '*' * 90 ~ '\n', True) %}
+        {% do exceptions.raise_compiler_error('\n\n' ~ 'Flow test for model ' ~ test_configuration.model_name ~ ' failed!!!\n') %}
     {% endif %}
-  {%- endset -%}
-
-  {% set test_queries = {
-    "actual_query": actual_query,
-    "expectations_query": expectations_query,
-    "test_query": test_query
-  } %}
-
-  {{ return (test_queries) }}
 {% endmacro %}
 
-{% macro show_test_report(test_configuration, test_report) %}
-  {% set model_name = test_configuration.model_name %}
-  {% set test_description = test_configuration.description | default('(no description)') %}
-
-  {{ dbt_unit_testing.println('{RED}MODEL: {YELLOW}model_name') }}
-  {{ dbt_unit_testing.println('{RED}TEST:  {YELLOW}' ~ test_description) }}
-  {% if test_report.expectations_row_count != test_report.actual_row_count %}
-    {{ dbt_unit_testing.println('{RED}ERROR: {YELLOW}Number of Rows do not match! (Expected: ' ~ test_report.expectations_row_count ~ ', Actual: ' ~ test_report.actual_row_count ~ ')') }}
-  {% endif %}
-  {% if test_report.different_rows_count > 0 %}
-    {{ dbt_unit_testing.println('{RED}ERROR: {YELLOW}Rows mismatch:') }}
-    {{ dbt_unit_testing.print_table(test_report.test_differences) }}
-  {% endif %}
+{% macro build_flow_relation(database, schema, name, test_name='') %}
+    {% if test_name %}
+        {% set identifier = dbt_flow.build_flow_identifier(test_name, name) %}
+    {% else %}
+        {% set identifier = name %}
+    {% endif %}
+    {% set flow_relation = api.Relation.create(
+        database=database,
+        schema=schema, 
+        identifier=identifier
+    ) %}
+    {% do return(flow_relation) %}
 {% endmacro %}
 
-{% macro run_test_query(test_configuration, test_queries) %}
-  {% set model_name = test_configuration.model_name %}
-  {% set test_description = test_configuration.description %}
-  {% set actual_query = test_queries.actual_query %}
-  {% set expectations_query = test_queries.expectations_query %}
-  {% set test_query = test_queries.test_query %}
-
-  {%- set count_query -%}
-    select * FROM 
-      (select count(1) as expectation_count from (
-        {{ expectations_query }}
-      ) as exp) as exp_count,
-      (select count(1) as actual_count from (
-        {{ actual_query }}
-      ) as act) as act_count
-  {%- endset -%}
-  {% set r1 = dbt_unit_testing.run_query(count_query) %}
-  {% set expectations_row_count = r1.columns[0].values() | first %}
-  {% set actual_row_count = r1.columns[1].values() | first %}
-
-  {% set test_differences = dbt_unit_testing.run_query(test_query) %}
-  {% set different_rows_count = test_differences.rows | length %}
-  {% set succeeded = different_rows_count == 0 and (expectations_row_count == actual_row_count) %}
-
-  {% set test_report = {
-    "expectations_row_count": expectations_row_count,
-    "actual_row_count": actual_row_count,
-    "different_rows_count": different_rows_count,
-    "test_differences": test_differences,
-    "succeeded": succeeded,
-  } %}
-  {{ return (test_report) }}
-
+{% macro create_flow_table(flow_relation, cache, query) %}
+    {% if flow_relation not in cache %}
+        {% do run_query(create_table_as(false, flow_relation, query)) %}
+    {% endif %}
 {% endmacro %}
 
-{% macro ref(model_name) %}
-  {% if 'unit-test' in config.get('tags') %}
-      {{ return (dbt_unit_testing.ref_cte_name(model_name)) }}
-  {% else %}
-      {{ return (builtins.ref(model_name)) }}
-  {% endif %}
+{% macro build_graph_views(node, config, relations, flow_relations) %}
+    {# metric nodes do not generate any query to be run so there's no relation we need to extract#}
+    {% if node.resource_type == 'metric' %}
+        {% set flow_relation = none %}
+    {% else %}
+        {% if node.resource_type == 'source' %}
+            {# the schema and database defined in the source node can point to outside tables so we make sure to use
+               our own database to create the mocked tables #}
+            {% set flow_relation = dbt_flow.build_flow_relation(
+                config.database, config.schema, 'source_' ~ node.name, config.test_name).render() %}
+        {% else %}
+            {% set flow_relation = dbt_flow.build_flow_relation(node.database, node.schema, node.name, config.test_name).render() %}
+        {% endif %}
+    {% endif %}
+
+    {# relation is already processed #}
+    {% if flow_relation in flow_relations %}
+        {% do return((relations, flow_relations)) %}
+    {% endif %}
+ 
+    {% set mock = config.mocks | selectattr('unique_id', '==', node.unique_id) | first %}
+    {% if mock %}
+        {% do dbt_flow.create_flow_table(flow_relation, flow_relations, mock.input_values) %}
+    {% else %}
+        {% for node_id in node.depends_on.nodes %}
+            {% set child_node = dbt_flow.node_by_id(node_id) %}
+            {# metric nodes are different from the rest. We need to further dig their
+               dependencies in order to find their references #}
+            {% if child_node.resource_type == 'metric' %}
+                {% for metric_deps_node_id in child_node.depends_on.nodes %}
+                    {% set metric_child_node = dbt_flow.node_by_id(metric_deps_node_id) %}
+                    {% set child_relations, child_flow_relations = dbt_flow.build_graph_views(metric_child_node, config, relations, flow_relations) %}
+                    {% for i in range(child_relations | length) %}
+                        {{ relations.append(child_relations[i]) }}
+                        {{ flow_relations.append(child_flow_relations[i]) }}
+                    {% endfor %}
+                {% endfor %}
+            {% else %}
+                {% set child_relations, child_flow_relations = dbt_flow.build_graph_views(child_node, config, relations, flow_relations) %}
+                {% for i in range(child_relations | length) %}
+                    {{ relations.append(child_relations[i]) }}
+                    {{ flow_relations.append(child_flow_relations[i]) }}
+                {% endfor %}
+            {% endif %}
+        {% endfor %}
+
+        {% if node.resource_type != 'metric' %}
+            {% set ns = namespace(node_query = render(node.raw_code)) %}
+            {% set relations = relations | unique | list %}
+            {% set flow_relations = flow_relations | unique | list %}
+
+            {% for i in range(relations | length) %}
+                {% set ns.node_query = ns.node_query | replace(relations[i], flow_relations[i]) %}
+            {% endfor %}
+            {% do dbt_flow.create_flow_table(flow_relation, flow_relations, ns.node_query) %}
+        {% endif %}
+    {% endif %}
+
+    {% if node.resource_type != 'metric' %}
+        {# source nodes already have their relation properly defined in the node definition #}
+        {% if node.resource_type == 'source' %}
+            {% set relation = node.relation_name %}
+        {% else %}
+            {% set relation = dbt_flow.build_flow_relation(node.database, node.schema, node.name).render() %}
+        {% endif %}
+        {{ relations.append(relation) }}
+        {{ flow_relations.append(flow_relation) }}
+    {% endif %}
+
+    {% set relations = relations | unique | list %}
+    {% set flow_relations = flow_relations | unique | list %}
+    {% do return((relations, flow_relations)) %}
 {% endmacro %}
 
-{% macro source(source, table_name) %}
-  {% if 'unit-test' in config.get('tags') %}
-      {{ return (dbt_unit_testing.source_cte_name(source, table_name)) }}
-  {% else %}
-      {{ return (builtins.source(source, table_name)) }}
-  {% endif %}
+{% macro build_expectations_table(expectations, node_to_test, config) %}
+    {% set relation = api.Relation.create(
+        database=node_to_test.database,
+        schema=node_to_test.schema,
+        identifier=dbt_flow.build_flow_identifier(config.test_name, 'expectations_' ~ node_to_test.name)
+    ) %}
+    {% do run_query(create_table_as(false, relation, expectations.input_values)) %}
+    {% do return(relation) %}
 {% endmacro %}
-
-{% macro ref_tested_model(model_name) %}
-  {% set ref_tested_model %}
-    -- We add an (unused) reference to the tested model,
-    -- so that DBT includes the model as a dependency of the test in the DAG
-    select * from {{ ref(model_name) }}
-  {% endset %}
-{% endmacro %}
-
