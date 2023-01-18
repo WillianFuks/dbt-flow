@@ -1,0 +1,32 @@
+---
+version: 2
+
+metrics:
+  - name: average_order_amount
+    label: Average Order Amount
+    model: ref('customers')
+    description: "The average size of a jaffle order"
+    calculation_method: average
+    expression: customer_lifetime_value
+    timestamp: most_recent_order
+    time_grains: [day, all_time]
+
+  - name: total_order_amount
+    label: Total Order Amount
+    model: ref('customers')
+    description: "The average size of a jaffle order"
+    calculation_method: sum
+    expression: customer_lifetime_value
+    timestamp: most_recent_order
+    time_grains: [day, all_time]
+
+models:
+  - name: customers
+    columns:
+      - name: customer_id
+      - name: first_name
+      - name: last_name
+      - name: first_order_date
+      - name: first_order_date
+      - name: number_of_orders
+      - name: total_amount

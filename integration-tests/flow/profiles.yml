@@ -1,0 +1,23 @@
+---
+integration_tests:
+  target: flow
+  outputs:
+    flow:
+      type: postgres
+      host: localhost
+      user: postgres
+      pass: postgres
+      port: 5432
+      schema: dbt_flow_test
+      dbname: postgres
+      threads: 1
+
+    dev:
+      type: postgres
+      host: postgres
+      user: postgres
+      pass: postgres
+      port: 5432
+      schema: dbt_dev
+      dbname: postgres
+      threads: 1

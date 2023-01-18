@@ -1,0 +1,23 @@
+---
+version: 2
+
+models:
+  - name: stg__customers
+    columns:
+      - name: customer_id
+      - name: first_name
+      - name: last_name
+
+  - name: stg__orders
+    columns:
+      - name: order_id
+      - name: customer_id
+      - name: order_date
+      - name: status
+
+  - name: stg__payments
+    columns:
+      - name: payment_id
+      - name: order_id
+      - name: payment_method
+      - name: amount
