@@ -6,7 +6,7 @@
 
 {{
     config(
-        tags=['unit-test']
+        tags=['flow-test']
     )
 }}
 
