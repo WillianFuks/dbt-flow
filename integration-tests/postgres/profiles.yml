@@ -1,0 +1,23 @@
+---
+integration_tests_postgres:
+  target: test
+  outputs:
+    dev:
+      type: postgres
+      host: localhost
+      user: postgres
+      pass: postgres
+      port: 5432
+      schema: dbt_dev
+      dbname: postgres
+      threads: 1
+
+    test:
+      type: postgres
+      host: "{{ env_var('POSTGRES_HOST', 'localhost') }}"
+      user: postgres
+      pass: postgres
+      port: 5432
+      schema: dbt_flow
+      dbname: postgres
+      threads: 1

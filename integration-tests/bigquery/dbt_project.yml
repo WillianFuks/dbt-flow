@@ -1,0 +1,29 @@
+---
+name: "dbt_flow_integration_tests_bigquery"
+version: "0.0.1"
+config-version: 2
+
+profile: "integration_tests_bigquery"
+
+model-paths: ["models"]
+analysis-paths: ["analysis"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+seed-paths: ["seeds"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_modules"
+  - "dbt_packages"
+
+models:
+  dbt_flow_integration_tests_bigquery:
+    staging:
+      +materialized: view
+
+vars:
+  dbt_flow_config:
+    verbose: false
+    drop_tables: false

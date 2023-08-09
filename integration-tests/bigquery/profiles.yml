@@ -1,0 +1,32 @@
+---
+integration_tests_bigquery:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: localhost
+      user: postgres
+      pass: postgres
+      port: 5432
+      schema: dbt_dev
+      dbname: postgres
+      threads: 1
+
+    test:
+      type: postgres
+      host: localhost
+      user: postgres
+      pass: postgres
+      port: 5432
+      schema: dbt_test_flow
+      dbname: postgres
+      threads: 1
+
+    test_bigquery:
+      type: bigquery
+      method: oauth
+      threads: 4
+      database: dbt-flow
+      dataset: dbt_flow
+      job_execution_timeout_seconds: 600
+      maximum_bytes_billed: 100000000
