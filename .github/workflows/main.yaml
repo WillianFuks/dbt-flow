@@ -1,0 +1,67 @@
+name: dbt-flow
+
+on:
+  push:
+  pull_request:
+    types: [ labeled ]
+    branches:
+      - master
+
+jobs:
+  integration_test_postgres:
+    runs-on: ubuntu-latest
+    container: python:3.11
+
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres        
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+
+      - name: Install and run tests
+        working-directory: integration-tests/postgres
+        env:
+          POSTGRES_HOST: postgres
+        run: |
+          pip install dbt-postgres==1.5.3
+          dbt deps
+          dbt seed
+          dbt test -s tag:flow-test
+
+  integration_tests_bigquery:
+    runs-on: ubuntu-latest
+    container: python:3.11
+    if: github.ref == 'refs/heads/master' || github.event.label.name == 'safe'
+
+    steps:
+      - uses: "actions/checkout@v2"
+
+      - id: "auth"
+        name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v0"
+        with:
+          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+
+      - name: "Set up Cloud SDK"
+        uses: "google-github-actions/setup-gcloud@v0"
+
+      - name: Test dbt with BigQuery
+        working-directory: integration-tests/bigquery
+        run: |
+          pip install dbt-bigquery==1.5.3
+          dbt deps
+          dbt seed -t test_bigquery
+          dbt test -t test_bigquery -s tag:flow-test
