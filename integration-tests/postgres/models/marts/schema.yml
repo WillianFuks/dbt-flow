@@ -1,0 +1,32 @@
+---
+version: 2
+
+metrics:
+  - name: average_order_amount
+    label: Average Order Amount
+    model: ref('customers')
+    calculation_method: average
+    expression: total_amount
+    timestamp: first_order_date
+    time_grains: [day]
+    dimensions:
+      - payment_method_name
+
+  - name: total_order_amount
+    label: Total Order Amount
+    model: ref('customers')
+    calculation_method: sum
+    expression: total_amount
+    timestamp: first_order_date
+    time_grains: [day]
+    dimensions:
+      - payment_method_name
+
+  - name: derived_test
+    label: der_test
+    calculation_method: derived
+    expression: "{{ metric('average_order_amount') }} / {{ metric('total_order_amount') }}"
+    timestamp: first_order_date
+    time_grains: [day]
+    dimensions:
+      - payment_method_name

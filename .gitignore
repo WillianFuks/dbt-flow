@@ -4,7 +4,7 @@ logs
 dbt_modules/
 dbt_packages/
 logs/
-integration-tests/ci/.user.yml
+*.user.yml
 tmp
 .idea
 
@@ -137,3 +137,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# temporary files for debuggin
+tmp*.txt
