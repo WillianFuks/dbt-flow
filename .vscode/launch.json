@@ -1,0 +1,43 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "python",
+      "request": "launch",
+      "name": "dbt-flow test debugger",
+      "program": "${file}",
+      "args": [
+        "test",
+        "-s",
+        "tag:flow-test"
+      ],
+      "justMyCode": false,
+      "console": "integratedTerminal",
+      "cwd": "${fileDirname}"
+    },
+    {
+      "type": "python",
+      "request": "launch",
+      "name": "dbt-flow run debugger",
+      "program": "${file}",
+      "args": [
+        "run"
+      ],
+      "justMyCode": false,
+      "console": "integratedTerminal",
+      "cwd": "${fileDirname}"
+    },
+    {
+      "type": "python",
+      "request": "launch",
+      "name": "dbt-flow seed debugger",
+      "program": "${file}",
+      "args": [
+        "seed"
+      ],
+      "justMyCode": false,
+      "console": "integratedTerminal",
+      "cwd": "${fileDirname}"
+    }
+  ]
+}
