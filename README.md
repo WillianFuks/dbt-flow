@@ -13,7 +13,7 @@ Just add the following to your project `packages.yml`:
 ```yml
 packages:
     - git: "https://github.com/WillianFuks/dbt-flow.git"
-      revision: master
+      revision: 0.0.1
 ```
 
 # Requirements
