@@ -12,6 +12,13 @@
 
     create or replace table {{ relation }}
     {{ partition_by(partition_config) }}
+
+    {% if 'partition_expiration_days' in config.config %}
+      OPTIONS(
+        partition_expiration_days={{ config.config['partition_expiration_days'] }}
+      )
+    {% endif %}
+
     as (
       {{ sql }}
     );
