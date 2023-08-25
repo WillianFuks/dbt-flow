@@ -295,7 +295,10 @@
   {%- set expected_mocked_relation = api.Relation.create(database=target.database, schema=target.schema,
     identifier=dbt_flow.build_flow_identifier(test_name=test_setup.test_name, identifier='expected')) -%}
 
-  {%- do dbt_flow.create_table(relation=expected_mocked_relation, sql=test_setup.expected, config=target_node_config) -%}
+  {%- set expected_config = target_node_config.copy() -%}
+  {# --Expected node should be built just as a table. Its only purpose is to store expected results, nothing else. #}
+  {%- do expected_config.update({'config': {'materialized': 'table'}}) -%}
+  {%- do dbt_flow.create_table(relation=expected_mocked_relation, sql=test_setup.expected, config=expected_config) -%}
 
   {%- do cached_nodes.update({
     'expected': {
