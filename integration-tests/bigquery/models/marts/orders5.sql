@@ -6,6 +6,7 @@
           "data_type": "timestamp",
           "granularity": "day"
         },
+        partition_expiration_days = 7
     )
 }}
 
