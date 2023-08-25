@@ -166,7 +166,7 @@
 
     {%- do dbt_flow.create_table(relation=mocked_relation, sql=mocked_sql, config=node_config) -%}
 
-    {%- do dbt_flow.log(test_setup.test_name, 'Mocked table "' ~ mocked_relation ~ '" for node "' ~ node_config.name ~ '" was created successfully', test_setup.options.get('verbose', false)) -%}
+    {%- do dbt_flow.log(test_setup.test_name, 'Mocked table "' ~ mocked_relation ~ '" for node "' ~ node_config.name ~ '" created successfully', test_setup.options.get('verbose', false)) -%}
 
     {%- do cached_nodes.update({
       node_uid: {
@@ -246,12 +246,12 @@
       {%- if is_incremental_node -%}
 
         {%- do dbt_flow.create_incremental_table(relation=mocked_relation, sql=ns.sql, config=node_config) -%}
-        {%- do dbt_flow.log(test_setup.test_name, 'Incremental mocked table "' ~ mocked_relation ~ '" for node "' ~ node_config.name ~ '" was created successfully', test_setup.options.get('verbose', false)) -%}
+        {%- do dbt_flow.log(test_setup.test_name, 'Incremental mocked table "' ~ mocked_relation ~ '" for node "' ~ node_config.name ~ '" created successfully', test_setup.options.get('verbose', false)) -%}
 
       {%- else -%}
 
         {%- do dbt_flow.create_table(relation=mocked_relation, sql=ns.sql, config=node_config) -%}
-        {%- do dbt_flow.log(test_setup.test_name, 'Mocked table "' ~ mocked_relation ~ '" for node "' ~ node_config.name ~ '" was created successfully', test_setup.options.get('verbose', false)) -%}
+        {%- do dbt_flow.log(test_setup.test_name, 'Mocked table "' ~ mocked_relation ~ '" for node "' ~ node_config.name ~ '" created successfully', test_setup.options.get('verbose', false)) -%}
 
       {%- endif -%}
 
@@ -304,7 +304,7 @@
     }}
   ) -%}
 
-  {%- do dbt_flow.log(test_setup.test_name, 'Expected mocked table "' ~ target_mocked_relation ~ '" for node "' ~ target_node_config.name ~ '" was created successfully', test_setup.options.get('verbose', false)) -%}
+  {%- do dbt_flow.log(test_setup.test_name, 'Expected mocked table "' ~ target_mocked_relation ~ '" for node "' ~ target_node_config.name ~ '" created successfully', test_setup.options.get('verbose', false)) -%}
 
   {%- set columns_to_compare = adapter.get_columns_in_relation(expected_mocked_relation) -%}
   {%- set columns_to_compare = dbt_flow.process_expected_columns(columns_to_compare) -%}
