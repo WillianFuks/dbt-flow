@@ -8,6 +8,8 @@
 
 In a nutshell, it's **unit-tests** for data transformations.
 
+![](https://github.com/WillianFuks/dbt-flow/actions/workflows/main.yaml/badge.svg?branch=master)
+
 # Installation
 
 Just add the following to your project `packages.yml`:
