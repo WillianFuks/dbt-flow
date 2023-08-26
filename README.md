@@ -1,4 +1,6 @@
-# dbt-flow
+
+<img src="imgs/dbt_flow_transparent_bg.png" style="position: center"/>
+
 
 `dbt-flow` is a package that adds integration tests functionality for dbt.
 
